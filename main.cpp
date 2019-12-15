@@ -13,21 +13,37 @@
 
 using namespace std;
 
-const int size = 35000;
+const int size = 8192;
+
+int positions[6] = {0, 0, 0, 0, 0, 0};
 
 void stencil_sequential();
 void stencil_parallel(int);
+void stencil_parallel_vers_2(int);
+void init_matrix();
+void display_values(int);
 
-int main() {
-   
+float *matrix;
+
+int main(int argc, char** argv) {
+    
+    for(int i=1; i< argc; i++){
+        
+        if(i==7)
+            break;
+        
+        positions[i-1] = stoi(argv[i]);
+    }
+    
+    init_matrix();
+    
     cout << "Starting timer." << endl;
     auto t1 = std::chrono::high_resolution_clock::now();
+
     
-//    cout<<"Sequential:"<<endl;
 //    stencil_sequential();
-    
-    cout<<"Parallel:"<<endl;
-    stencil_parallel(2);
+
+    stencil_parallel(4);
     
     
     auto t2 = chrono::high_resolution_clock::now();
@@ -44,100 +60,138 @@ int main() {
 
 void stencil_sequential(){
     
-    float *matrix = new float[size*size];
-    
-    
-    
-    for (int i=0; i<size; i++) {
+    cout<<"Sequential:"<<endl;
+    for (int i=1; i<size; i++) {
         
-        for (int j=0; j<size; j++){
+        for (int j=1; j<size; j++){
             
-            if(i==0 && j==0){
-                matrix[0] = 0;
-            }
-            else if(i==0 && j>0){
-                matrix[(i*size) + j] = 250;
-            }
-            else if(i>0 && j==0){
-                matrix[(i*size) + j] = 150;
-            }
-            else {
                 matrix[(i*size) + j] = ( abs( sin( matrix[(i*size) + (j-1)]) )
                                       + abs( sin( matrix[((i-1)*size + (j-1))]) )
                                       + abs( sin( matrix[((i-1)*size) + j]) ) )*100;
-            }
         }
     }
     
     
-    cout<< "Matrix[50][50]:" << matrix[8168*size+8400]<<endl;
+   display_values(1);
 }
 
 
 void stencil_parallel(int num_threads){
+
+    cout<<"Parallel:"<<endl;
     
-    float *matrix = new float[size*size];
+     for (int i=2; i<2*size; i++) {
+         
+         
+         if(i<size){
+             
+            #pragma omp parallel for num_threads(num_threads)
+             for (int j = 1; j < i; j++)
+             {
+                 matrix[((i-j)*size) + j] = ( fabs( sin( matrix[(i-j-1)*size + j-1]))
+                                               + fabs(sin(matrix[(i-j)*size + j-1]))
+                                               + fabs(sin(matrix[(i-j-1)*size + j]))
+                                               )*100;
+             }
+         }
+         
+         else{
+             
+             
+             #pragma omp parallel for num_threads(num_threads)
+             for (int j = size-1; j > i-size; j--)
+             {
+                 matrix[((i-j)*size) + j] = ( fabs( sin( matrix[(i-j-1)*size + j-1]))
+                                             + fabs(sin(matrix[(i-j)*size + j-1]))
+                                             + fabs(sin(matrix[(i-j-1)*size + j]))
+                                             )*100;
+             }
+             
+         }
+         
+
+     }
     
-     for (int i=0; i<size; i++) {
-        #pragma omp parallel num_threads(2)
-         {
-             
-             int threadNumber = omp_get_thread_num();
-             
-             for(int j=i; j<size; j++){
-                 
-                 
-                 
+   display_values(num_threads);
+    
+}
+
+
+
+void stencil_parallel_vers_2(int num_threads){
+     cout<<"Parallel Second Version:"<<endl;
+
+    for (int i=1; i<size; i++) {
+        
+        #pragma omp parallel num_threads(4)
+        {
+            
+            int threadNumber = omp_get_thread_num();
+            
+            for(int j=i; j<size; j++){
+                
+                int row = 0, col = 0;
+                
                 //If it is first thread,
                 // changa values iterating into rows
                 if(threadNumber == 0)
                 {
-                    int row = i;
-                    int col = j;
+                    row = i;
+                    col = j;
                     
-                    if(row == 0 && col == 0){
-                        matrix[0] = 0;
-                    }
-                    else if(row == 0){
-                        matrix[(row*size) + col] = 250;
-                    }
-                    else{
-                        matrix[(row*size) + col] = ( abs( sin( matrix[(row*size) + (col-1)]) )
+                }
+                
+                //If it is second thread,
+                // changa values iterating into columns
+                else
+                {
+                    row = j;
+                    col = i;
+                    
+                }
+                
+                
+                matrix[(row*size) + col] = ( abs( sin( matrix[(row*size) + (col-1)]) )
                                             + abs( sin( matrix[((row-1)*size + (col-1))]) )
                                             + abs( sin( matrix[((row-1)*size) + col]) ) )*100;
-                    }
-                }
-                 
-                 //If it is second thread,
-                 // changa values iterating into columns
-                 else if(threadNumber == 1)
-                 {
-                     int row = j;
-                     int col = i;
-                     
-                     if(row == 0 && col == 0){
-                         matrix[0] = 0;
-                     }
-                     else if(col == 0){
-                         matrix[(row*size) + col] = 150;
-                     }
-                     else{
-                     
-                         matrix[(row*size) + col] = ( abs( sin( matrix[(row*size) + (col-1)]) )
-                                                 + abs( sin( matrix[((row-1)*size + (col-1))]) )
-                                                 + abs( sin( matrix[((row-1)*size) + col]) ) )*100;
-                     }
-                 }
-                 
-                 
-             }
-           
-         }
+                
+            }
+            
+        }
         
-//         #pragma omp barrier
-
-     }
+        //         #pragma omp barrier
+        
+    }
     
-    cout<< "Matrix[50][50]:" << matrix[8168*size+8400]<<endl;
+    display_values(num_threads);
     
 }
+
+
+
+void init_matrix(){
+    
+    
+    matrix = new float[size*size];
+    
+    matrix[0] = 0;
+    
+    for (int i=1; i<size; i++) {
+        
+        matrix[i] = 250;
+        matrix[i*size] = 150;
+        
+    }
+}
+
+
+void display_values(int num_threads){
+    
+    cout<< "Number of threads: "<<num_threads<<endl<< "Values: "<<endl;
+    
+    cout<< "Matrix["<<positions[0]<<"]["<<positions[1]<<"]:" << matrix[positions[0]*size+positions[1]]<<endl;
+    cout<< "Matrix["<<positions[2]<<"]["<<positions[3]<<"]:" << matrix[positions[2]*size+positions[3]]<<endl;
+    cout<< "Matrix["<<positions[4]<<"]["<<positions[5]<<"]:" << matrix[positions[4]*size+positions[5]]<<endl;
+    
+}
+
