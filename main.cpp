@@ -11,9 +11,10 @@
 #include <omp.h>
 #include <chrono>
 
+
 using namespace std;
 
-const int size = 8192;
+const int size = 20000;
 
 int positions[6] = {0, 0, 0, 0, 0, 0};
 
@@ -38,12 +39,14 @@ int main(int argc, char** argv) {
     init_matrix();
     
     cout << "Starting timer." << endl;
-    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t1 = chrono::high_resolution_clock::now();
 
     
-//    stencil_sequential();
+    stencil_sequential();
 
-    stencil_parallel(4);
+//    stencil_parallel(8);
+    
+//    stencil_parallel_vers_2(2);
     
     
     auto t2 = chrono::high_resolution_clock::now();
@@ -123,7 +126,7 @@ void stencil_parallel_vers_2(int num_threads){
 
     for (int i=1; i<size; i++) {
         
-        #pragma omp parallel num_threads(4)
+        #pragma omp parallel num_threads(num_threads)
         {
             
             int threadNumber = omp_get_thread_num();
